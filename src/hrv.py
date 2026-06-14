@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from health_dashboard.config import settings
-from health_dashboard.db import connect
+from config import settings
+from db import connect
 
 
 HRV_GLOB = "samsunghealth_vikas.negi10_20260606141288/jsons/com.samsung.health.hrv/**/*.json"

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import duckdb
 
-from health_dashboard.config import settings
+from config import settings
 
 
 def connect(database: Path | str = settings.duckdb_path) -> duckdb.DuckDBPyConnection:

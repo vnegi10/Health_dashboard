@@ -3,9 +3,9 @@ from pathlib import Path
 import plotly.express as px
 import streamlit as st
 
-from health_dashboard.config import settings
-from health_dashboard.etl import load_hrv_nightly_summary, refresh_hrv_tables
-from health_dashboard.ingest.discovery import summarize_export_files
+from config import settings
+from discovery import summarize_export_files
+from hrv import load_hrv_nightly_summary, refresh_hrv_tables
 
 
 @st.cache_data(show_spinner=False)

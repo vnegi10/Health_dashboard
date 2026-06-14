@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from health_dashboard.config import settings
+from config import settings
 
 
 @dataclass(frozen=True)
