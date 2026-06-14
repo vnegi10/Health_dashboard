@@ -40,8 +40,6 @@ src/health_dashboard/      Reusable ingestion, ETL, and dashboard code
 src/health_dashboard/db/   DuckDB connection and database helpers
 src/health_dashboard/etl/  Transformations from raw tables to marts
 src/health_dashboard/ingest/ Raw CSV/JSON discovery and loading
-sql/raw/                   SQL for raw/staging tables
-sql/marts/                 SQL for analytics marts
 tests/                     Unit tests
 data/                      Local Samsung Health export, ignored by git
 warehouse/                 Generated DuckDB database, ignored by git
