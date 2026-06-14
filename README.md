@@ -4,7 +4,7 @@ Personal dashboard for Samsung Health exports using:
 
 - `uv` for Python package management
 - DuckDB for raw ingestion and ETL
-- Streamlit for the frontend dashboard
+- Streamlit for the frontend
 
 ## Setup
 
@@ -56,6 +56,28 @@ This table preserves each Samsung Health HRV reading and adds normalized timesta
 | `end_time_local` | `TIMESTAMP` | Reading end time converted to `Europe/Amsterdam`. |
 | `sdnn` | `DOUBLE` | SDNN HRV value in milliseconds. |
 | `rmssd` | `DOUBLE` | RMSSD HRV value in milliseconds. |
+
+### `hrv_with_night`
+
+Intermediate HRV CTE used inside the SQL that builds `hrv_nightly_summary` and inside the detail query for a selected night. This is not persisted as a DuckDB table.
+
+It assigns each raw HRV reading to a sleep-night start date using local Amsterdam time:
+
+- readings before noon are assigned to the previous calendar date
+- readings at noon or later are assigned to the same calendar date
+- rows with missing HRV values or timestamps are filtered out
+
+| Column | Type | Description |
+| --- | --- | --- |
+| `night_start_date` | `DATE` | Local date used as the sleep-night grouping key. |
+| `sdnn` | `DOUBLE` | SDNN HRV value in milliseconds. |
+| `rmssd` | `DOUBLE` | RMSSD HRV value in milliseconds. |
+| `start_time_utc` | `TIMESTAMP` | Reading start time in UTC. |
+| `end_time_utc` | `TIMESTAMP` | Reading end time in UTC. |
+| `start_time_local` | `TIMESTAMP` | Reading start time in `Europe/Amsterdam`; included in the details query. |
+| `end_time_local` | `TIMESTAMP` | Reading end time in `Europe/Amsterdam`; included in the details query. |
+| `datauuid` | `VARCHAR` | Source reading UUID; included in the details query. |
+| `filename` | `VARCHAR` | Source JSON file path; included in the details query. |
 
 ### `hrv_nightly_summary`
 
