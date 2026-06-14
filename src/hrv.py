@@ -6,7 +6,7 @@ from config import settings
 from db import connect
 
 
-HRV_GLOB = "samsunghealth_vikas.negi10_20260606141288/jsons/com.samsung.health.hrv/**/*.json"
+HRV_GLOB = "samsunghealth_*/jsons/com.samsung.health.hrv/**/*.json"
 
 
 def _hrv_json_glob(data_dir: Path = settings.data_dir) -> str:
