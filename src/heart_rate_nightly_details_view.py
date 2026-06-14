@@ -5,6 +5,9 @@ import streamlit as st
 from heart_rate import load_heart_rate_nightly_summary, load_heart_rate_readings_for_night
 
 
+HEATMAP_START_DATE = pd.Timestamp("2025-07-01")
+
+
 @st.cache_data(show_spinner=False)
 def get_heart_rate_nightly_summary():
     return load_heart_rate_nightly_summary()
@@ -49,6 +52,12 @@ def render_heart_rate_nightly_details_page() -> None:
 
     calendar_data = nightly_summary.copy()
     calendar_data["night_start_date"] = pd.to_datetime(calendar_data["night_start_date"])
+    calendar_data = calendar_data[calendar_data["night_start_date"] >= HEATMAP_START_DATE]
+
+    if calendar_data.empty:
+        st.warning("No nightly heart rate rows were found from July 1, 2025 onward.")
+        return
+
     calendar_data["date"] = calendar_data["night_start_date"].dt.strftime("%Y-%m-%d")
     calendar_data["week_start"] = calendar_data["night_start_date"] - pd.to_timedelta(
         calendar_data["night_start_date"].dt.weekday,
@@ -71,6 +80,8 @@ def render_heart_rate_nightly_details_page() -> None:
         "selected_hr_nightly_detail",
         calendar_data.iloc[-1]["date"],
     )
+    if selected_default not in set(calendar_data["date"]):
+        selected_default = calendar_data.iloc[-1]["date"]
 
     fig = px.scatter(
         calendar_data,
