@@ -7,6 +7,7 @@ import streamlit as st
 from config import settings
 from discovery import summarize_export_files
 from hrv import load_hrv_nightly_summary, load_hrv_readings_for_night, refresh_hrv_tables
+from steps import load_steps_daily_summary, refresh_steps_tables
 
 
 @st.cache_data(show_spinner=False)
@@ -17,6 +18,11 @@ def get_hrv_summary():
 @st.cache_data(show_spinner=False)
 def get_hrv_readings_for_night(night_start_date: str):
     return load_hrv_readings_for_night(night_start_date)
+
+
+@st.cache_data(show_spinner=False)
+def get_steps_daily_summary():
+    return load_steps_daily_summary()
 
 
 def render_raw_export_status_page() -> None:
@@ -296,3 +302,122 @@ def render_hrv_details_page() -> None:
                 "sdnn": st.column_config.NumberColumn("SDNN", format="%.2f ms"),
             },
         )
+
+
+def render_steps_summary_page() -> None:
+    data_dir = Path(settings.data_dir)
+
+    st.title("Steps Summary")
+    st.caption("Daily Samsung Health step count and distance")
+
+    if not data_dir.exists():
+        st.warning(f"Data directory not found: {data_dir}")
+        return
+
+    with st.spinner("Loading steps data from DuckDB..."):
+        steps_summary = get_steps_daily_summary()
+
+    if steps_summary.empty:
+        st.warning("No daily step count rows were found in the Samsung Health export.")
+        return
+
+    steps_summary = steps_summary.copy()
+    steps_summary["day"] = pd.to_datetime(steps_summary["day"])
+
+    latest = steps_summary.iloc[-1]
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("Days", f"{len(steps_summary):,}")
+    metric_cols[1].metric("Latest steps", f"{int(latest.steps):,}")
+    metric_cols[2].metric("Latest distance", f"{latest.distance_km:.2f} km")
+    metric_cols[3].metric("Total distance", f"{steps_summary.distance_km.sum():,.1f} km")
+
+    min_day = steps_summary["day"].min().date()
+    max_day = steps_summary["day"].max().date()
+    default_start = max(min_day, max_day - pd.Timedelta(days=89))
+    start_day, end_day = st.slider(
+        "Date range",
+        min_value=min_day,
+        max_value=max_day,
+        value=(default_start, max_day),
+        format="YYYY-MM-DD",
+    )
+
+    range_data = steps_summary[
+        (steps_summary["day"].dt.date >= start_day)
+        & (steps_summary["day"].dt.date <= end_day)
+    ]
+
+    steps_fig = px.bar(
+        range_data,
+        x="day",
+        y="steps",
+        labels={"day": "Day", "steps": "Steps"},
+        color_discrete_sequence=["#0f766e"],
+    )
+    steps_fig.update_layout(height=380, margin={"l": 8, "r": 8, "t": 24, "b": 8})
+    st.plotly_chart(steps_fig, width="stretch")
+
+    distance_fig = px.bar(
+        range_data,
+        x="day",
+        y="distance_km",
+        labels={"day": "Day", "distance_km": "Distance (km)"},
+        color_discrete_sequence=["#2563eb"],
+    )
+    distance_fig.update_layout(height=340, margin={"l": 8, "r": 8, "t": 24, "b": 8})
+    st.plotly_chart(distance_fig, width="stretch")
+
+    st.subheader("Calendar Heatmap")
+    month_options = steps_summary["day"].dt.to_period("M").astype(str).sort_values().unique()
+    selected_month = st.selectbox("Month", month_options, index=len(month_options) - 1)
+
+    month_start = pd.Period(selected_month, freq="M").to_timestamp()
+    month_end = month_start + pd.offsets.MonthEnd(0)
+    month_days = pd.DataFrame({"day": pd.date_range(month_start, month_end, freq="D")})
+    heatmap_data = month_days.merge(steps_summary[["day", "steps"]], on="day", how="left")
+    heatmap_data["steps"] = heatmap_data["steps"].fillna(0)
+    heatmap_data["week_start"] = heatmap_data["day"] - pd.to_timedelta(
+        heatmap_data["day"].dt.weekday,
+        unit="D",
+    )
+    heatmap_data["weekday_index"] = heatmap_data["day"].dt.weekday
+    heatmap_data["date"] = heatmap_data["day"].dt.strftime("%Y-%m-%d")
+    heatmap_data["hover"] = (
+        heatmap_data["date"] + "<br>Steps " + heatmap_data["steps"].map("{:,.0f}".format)
+    )
+
+    heatmap_fig = px.scatter(
+        heatmap_data,
+        x="week_start",
+        y="weekday_index",
+        color="steps",
+        custom_data=["date"],
+        hover_name="hover",
+        color_continuous_scale="Greens",
+        labels={"week_start": "Week", "weekday_index": "Day", "steps": "Steps"},
+    )
+    heatmap_fig.update_traces(
+        marker={
+            "symbol": "square",
+            "size": 34,
+            "line": {"width": 1, "color": "rgba(255,255,255,0.9)"},
+        },
+        hovertemplate="%{hovertext}<extra></extra>",
+    )
+    heatmap_fig.update_layout(
+        height=300,
+        margin={"l": 8, "r": 8, "t": 12, "b": 8},
+        coloraxis_colorbar={"title": "Steps"},
+    )
+    heatmap_fig.update_yaxes(
+        tickmode="array",
+        tickvals=[0, 1, 2, 3, 4, 5, 6],
+        ticktext=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        autorange="reversed",
+    )
+    st.plotly_chart(heatmap_fig, width="stretch")
+
+    if st.button("Refresh steps tables"):
+        refresh_steps_tables(data_dir)
+        get_steps_daily_summary.clear()
+        st.rerun()
