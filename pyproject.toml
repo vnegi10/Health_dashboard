@@ -1,0 +1,42 @@
+[project]
+name = "health-dashboard"
+version = "0.1.0"
+description = "Personal Samsung Health analytics dashboard built with DuckDB and Streamlit."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb>=1.0.0",
+    "pandas>=2.2.0",
+    "plotly>=5.24.0",
+    "pyarrow>=17.0.0",
+    "streamlit>=1.38.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "ruff>=0.6.0",
+]
+
+[project.scripts]
+health-dashboard = "health_dashboard.app:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+exclude = [
+    "/data",
+    "/warehouse",
+]
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

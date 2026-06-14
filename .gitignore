@@ -1,0 +1,19 @@
+# Raw Samsung Health export data. Keep this local only.
+data/
+
+# Generated local database and derived artifacts.
+warehouse/
+*.duckdb
+*.duckdb.wal
+*.parquet
+
+# Python and tooling output.
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Local configuration.
+.env
+.streamlit/secrets.toml
