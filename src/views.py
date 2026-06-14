@@ -48,7 +48,7 @@ def render_raw_export_status_page() -> None:
 def render_hrv_summary_page() -> None:
     data_dir = Path(settings.data_dir)
 
-    st.title("Nightly HRV")
+    st.title("HRV Nightly Summary")
     st.caption("Samsung Health nightly HRV analytics powered by DuckDB")
 
     if not data_dir.exists():
@@ -166,7 +166,7 @@ def _selected_calendar_date(selection_event, fallback: str) -> str:
 
 
 def render_hrv_details_page() -> None:
-    st.title("HRV Details")
+    st.title("HRV Nightly Details")
     st.caption("Calendar view with per-night HRV variation")
 
     with st.spinner("Loading HRV calendar..."):

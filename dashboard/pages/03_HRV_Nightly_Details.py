@@ -9,5 +9,5 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from views import render_hrv_details_page  # noqa: E402
 
 
-st.set_page_config(page_title="HRV Details", page_icon="heart", layout="wide")
+st.set_page_config(page_title="HRV Nightly Details", page_icon="heart", layout="wide")
 render_hrv_details_page()

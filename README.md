@@ -32,6 +32,18 @@ Refresh the steps DuckDB tables:
 uv run python -c "from steps import refresh_steps_tables; refresh_steps_tables()"
 ```
 
+Refresh the heart rate DuckDB tables:
+
+```bash
+uv run python -c "from heart_rate import refresh_heart_rate_tables; refresh_heart_rate_tables()"
+```
+
+Refresh the nightly heart rate DuckDB tables:
+
+```bash
+uv run python -c "from heart_rate import refresh_heart_rate_nightly_tables; refresh_heart_rate_nightly_tables()"
+```
+
 ## DuckDB Tables
 
 The dashboard currently builds the following tables in `warehouse/health.duckdb`.
@@ -134,6 +146,89 @@ Day-level steps aggregate used by the Steps Summary page. It groups duplicate so
 | `active_time_ms` | `BIGINT` | Daily active time in milliseconds. |
 | `source_rows` | `BIGINT` | Number of raw source rows for the day. |
 | `devices` | `BIGINT` | Number of distinct devices/source IDs for the day. |
+
+### `heart_rate_raw_csv`
+
+Raw heart rate readings ingested from:
+
+```text
+data/samsunghealth_*/com.samsung.shealth.tracker.heart_rate.*.csv
+```
+
+This table preserves each Samsung Health heart rate reading and normalizes the fully-qualified Samsung column names into shorter dashboard-friendly names.
+
+| Column | Type | Description |
+| --- | --- | --- |
+| `filename` | `VARCHAR` | Full source CSV file path. |
+| `datauuid` | `VARCHAR` | Samsung Health row UUID. |
+| `deviceuuid` | `VARCHAR` | Device/source identifier from the export. |
+| `start_time_local` | `TIMESTAMP` | Reading start timestamp from the export. |
+| `end_time_local` | `TIMESTAMP` | Reading end timestamp from the export. |
+| `day` | `DATE` | Local date derived from `start_time_local`. |
+| `time_offset` | `VARCHAR` | Source timezone offset string from Samsung Health. |
+| `heart_rate` | `DOUBLE` | Heart rate reading in beats per minute. |
+| `min_heart_rate` | `DOUBLE` | Minimum heart rate value reported for the reading. |
+| `max_heart_rate` | `DOUBLE` | Maximum heart rate value reported for the reading. |
+| `heart_beat_count` | `BIGINT` | Heart beat count reported by Samsung Health. |
+| `tag_id` | `BIGINT` | Samsung Health tag identifier. |
+| `source` | `BIGINT` | Samsung Health source identifier. |
+| `update_time` | `TIMESTAMP` | Source row update timestamp. |
+| `create_time` | `TIMESTAMP` | Source row creation timestamp. |
+
+### `heart_rate_daily_summary`
+
+Day-level heart rate aggregate used by the HR Summary page and calendar heatmap.
+
+| Column | Type | Description |
+| --- | --- | --- |
+| `day` | `DATE` | Local date. |
+| `avg_heart_rate` | `DOUBLE` | Average heart rate for the day, rounded to two decimals. |
+| `min_heart_rate` | `DOUBLE` | Minimum heart rate reading for the day. |
+| `max_heart_rate` | `DOUBLE` | Maximum heart rate reading for the day. |
+| `readings` | `BIGINT` | Number of readings included in the daily aggregate. |
+| `devices` | `BIGINT` | Number of distinct devices/source IDs for the day. |
+| `first_reading_local` | `TIMESTAMP` | Earliest reading timestamp for the day. |
+| `last_reading_local` | `TIMESTAMP` | Latest reading timestamp for the day. |
+
+### `heart_rate_clean_json`
+
+Raw heart rate readings ingested from:
+
+```text
+data/samsunghealth_*/jsons/com.samsung.shealth.tracker.heart_rate/**/*.json
+```
+
+This table is used for sleep-night heart rate summaries from the JSON binning-data export.
+
+| Column | Type | Description |
+| --- | --- | --- |
+| `datauuid` | `VARCHAR` | UUID extracted from the source JSON filename. |
+| `filename` | `VARCHAR` | Full source JSON file path. |
+| `start_time_utc` | `TIMESTAMP` | Reading start time normalized to UTC. |
+| `end_time_utc` | `TIMESTAMP` | Reading end time normalized to UTC. |
+| `start_time_local` | `TIMESTAMP` | Reading start time converted to `Europe/Amsterdam`. |
+| `end_time_local` | `TIMESTAMP` | Reading end time converted to `Europe/Amsterdam`. |
+| `heart_rate` | `DOUBLE` | Heart rate reading in beats per minute. |
+| `heart_rate_min` | `DOUBLE` | Minimum heart rate value reported for the reading. |
+| `heart_rate_max` | `DOUBLE` | Maximum heart rate value reported for the reading. |
+
+### `heart_rate_nightly_summary`
+
+Night-level heart rate aggregate used by the HR Nightly Summary page. Nights are grouped by local Amsterdam time: readings before noon are assigned to the previous night.
+
+| Column | Type | Description |
+| --- | --- | --- |
+| `night` | `VARCHAR` | Display label for the sleep night, such as `2026-06-13 : 2026-06-14`. |
+| `night_start_date` | `DATE` | Local date on which the sleep night started. |
+| `night_end_date` | `DATE` | Local date after `night_start_date`. |
+| `avg_heart_rate` | `DOUBLE` | Average heart rate for the night, rounded to two decimals. |
+| `min_heart_rate` | `DOUBLE` | Minimum heart rate reported for the night. |
+| `max_heart_rate` | `DOUBLE` | Maximum heart rate reported for the night. |
+| `first_reading_utc` | `TIMESTAMP` | Earliest heart rate reading timestamp for the night in UTC. |
+| `last_reading_utc` | `TIMESTAMP` | Latest heart rate reading timestamp for the night in UTC. |
+| `readings` | `BIGINT` | Number of heart rate readings included in the nightly aggregate. |
+
+The HR Nightly Details page uses `heart_rate_clean_json` directly with the same sleep-night assignment rule to show per-reading heart rate variation for a selected night.
 
 ## Project Layout
 
