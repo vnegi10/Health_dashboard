@@ -106,3 +106,58 @@ def load_hrv_nightly_summary() -> pd.DataFrame:
             ORDER BY night_start_date;
             """
         ).fetchdf()
+
+
+def load_hrv_readings_for_night(night_start_date: str) -> pd.DataFrame:
+    with connect() as conn:
+        table_exists = conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM information_schema.tables
+            WHERE table_name = 'hrv_clean_json';
+            """
+        ).fetchone()[0]
+
+        if not table_exists:
+            refresh_hrv_tables()
+
+        return conn.execute(
+            """
+            WITH hrv_with_night AS (
+                SELECT
+                    CASE
+                        WHEN date_part('hour', start_time_local) < 12
+                            THEN CAST(start_time_local AS DATE) - 1
+                        ELSE CAST(start_time_local AS DATE)
+                    END AS night_start_date,
+                    start_time_utc,
+                    end_time_utc,
+                    start_time_local,
+                    end_time_local,
+                    sdnn,
+                    rmssd,
+                    datauuid,
+                    filename
+                FROM hrv_clean_json
+                WHERE
+                    sdnn IS NOT NULL
+                    AND rmssd IS NOT NULL
+                    AND start_time_local IS NOT NULL
+                    AND end_time_local IS NOT NULL
+            )
+            SELECT
+                night_start_date,
+                start_time_utc,
+                end_time_utc,
+                start_time_local,
+                end_time_local,
+                sdnn,
+                rmssd,
+                datauuid,
+                filename
+            FROM hrv_with_night
+            WHERE night_start_date = CAST(? AS DATE)
+            ORDER BY start_time_local;
+            """,
+            [night_start_date],
+        ).fetchdf()
