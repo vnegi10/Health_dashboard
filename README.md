@@ -20,11 +20,16 @@ Run the dashboard:
 uv run streamlit run dashboard/Home.py
 ```
 
-Run ingestion once implemented:
+Refresh the HRV DuckDB tables:
 
 ```bash
-uv run python -m health_dashboard.ingest
+uv run python -c "from health_dashboard.etl import refresh_hrv_tables; refresh_hrv_tables()"
 ```
+
+The dashboard currently builds these DuckDB tables:
+
+- `hrv_clean_json`: raw HRV readings from `data/samsunghealth_vikas.negi10_20260606141288/jsons/com.samsung.health.hrv/**/*.json`
+- `hrv_nightly_summary`: nightly average SDNN/RMSSD grouped by local Amsterdam sleep night
 
 ## Project Layout
 
