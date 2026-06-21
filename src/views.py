@@ -7,8 +7,9 @@ import streamlit as st
 
 from config import settings
 from discovery import summarize_export_files
-from hrv import load_hrv_nightly_summary, load_hrv_readings_for_night, refresh_hrv_tables
-from steps import load_steps_daily_summary, refresh_steps_tables
+from hrv import load_hrv_nightly_summary, load_hrv_readings_for_night
+from maintenance import load_data_freshness, refresh_all_tables
+from steps import load_steps_daily_summary
 
 
 @st.cache_data(show_spinner=False)
@@ -44,6 +45,54 @@ def render_raw_export_status_page() -> None:
     status_cols[2].metric("DuckDB path", str(db_path))
 
     st.dataframe(summary.by_extension, width="stretch", hide_index=True)
+
+    st.subheader("Data Freshness")
+    freshness = load_data_freshness(data_dir)
+    latest_timestamp = freshness["latest_timestamp"].dropna().max()
+    freshness_cols = st.columns(2)
+    freshness_cols[0].metric(
+        "Latest data timestamp",
+        "n/a" if pd.isna(latest_timestamp) else f"{latest_timestamp:%Y-%m-%d %H:%M}",
+    )
+    freshness_cols[1].metric(
+        "Tracked datasets",
+        f"{freshness['latest_timestamp'].notna().sum()} / {len(freshness)}",
+    )
+    st.dataframe(
+        freshness,
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "latest_timestamp": st.column_config.DatetimeColumn(
+                "Latest timestamp",
+                format="YYYY-MM-DD HH:mm",
+            ),
+            "rows": st.column_config.NumberColumn("Rows", format="%d"),
+        },
+    )
+
+    if st.button("Refresh all", type="primary"):
+        with st.spinner("Refreshing all DuckDB tables..."):
+            refresh_all_tables(data_dir)
+        from heart_rate_nightly_details_view import (
+            get_heart_rate_nightly_summary as get_hr_detail_nightly_summary,
+        )
+        from heart_rate_nightly_details_view import get_heart_rate_readings_for_night
+        from heart_rate_nightly_view import get_heart_rate_nightly_summary
+        from heart_rate_view import (
+            get_heart_rate_daily_summary,
+            get_heart_rate_readings_for_day,
+        )
+
+        get_hrv_summary.clear()
+        get_hrv_readings_for_night.clear()
+        get_steps_daily_summary.clear()
+        get_heart_rate_daily_summary.clear()
+        get_heart_rate_readings_for_day.clear()
+        get_heart_rate_nightly_summary.clear()
+        get_hr_detail_nightly_summary.clear()
+        get_heart_rate_readings_for_night.clear()
+        st.rerun()
 
 
 def render_hrv_summary_page() -> None:
@@ -137,12 +186,6 @@ def render_hrv_summary_page() -> None:
             "readings": st.column_config.NumberColumn("Readings", format="%d"),
         },
     )
-
-    if st.button("Refresh HRV tables"):
-        refresh_hrv_tables(data_dir)
-        get_hrv_summary.clear()
-        get_hrv_readings_for_night.clear()
-        st.rerun()
 
 
 def _selected_calendar_date(selection_event, fallback: str) -> str:
@@ -532,8 +575,3 @@ def render_steps_summary_page() -> None:
         autorange="reversed",
     )
     st.plotly_chart(heatmap_fig, width="stretch")
-
-    if st.button("Refresh steps tables"):
-        refresh_steps_tables(data_dir)
-        get_steps_daily_summary.clear()
-        st.rerun()

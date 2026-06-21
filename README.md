@@ -20,28 +20,10 @@ Run the dashboard:
 uv run streamlit run dashboard/Home.py
 ```
 
-Refresh the HRV DuckDB tables:
+Refresh all DuckDB tables:
 
 ```bash
-uv run python -c "from hrv import refresh_hrv_tables; refresh_hrv_tables()"
-```
-
-Refresh the steps DuckDB tables:
-
-```bash
-uv run python -c "from steps import refresh_steps_tables; refresh_steps_tables()"
-```
-
-Refresh the heart rate DuckDB tables:
-
-```bash
-uv run python -c "from heart_rate import refresh_heart_rate_tables; refresh_heart_rate_tables()"
-```
-
-Refresh the nightly heart rate DuckDB tables:
-
-```bash
-uv run python -c "from heart_rate import refresh_heart_rate_nightly_tables; refresh_heart_rate_nightly_tables()"
+uv run python -c "from maintenance import refresh_all_tables; refresh_all_tables()"
 ```
 
 ## DuckDB Tables

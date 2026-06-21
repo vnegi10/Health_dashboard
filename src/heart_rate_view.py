@@ -5,7 +5,6 @@ import streamlit as st
 from heart_rate import (
     load_heart_rate_daily_summary,
     load_heart_rate_readings_for_day,
-    refresh_heart_rate_tables,
 )
 
 
@@ -209,9 +208,3 @@ def render_heart_rate_summary_page() -> None:
                 "max_heart_rate": st.column_config.NumberColumn("Max", format="%.1f bpm"),
             },
         )
-
-    if st.button("Refresh heart rate tables"):
-        refresh_heart_rate_tables()
-        get_heart_rate_daily_summary.clear()
-        get_heart_rate_readings_for_day.clear()
-        st.rerun()

@@ -1,8 +1,8 @@
-import pandas as pd
 import plotly.express as px
 import streamlit as st
+import pandas as pd
 
-from heart_rate import load_heart_rate_nightly_summary, refresh_heart_rate_nightly_tables
+from heart_rate import load_heart_rate_nightly_summary
 
 
 @st.cache_data(show_spinner=False)
@@ -77,8 +77,3 @@ def render_heart_rate_nightly_page() -> None:
             "readings": st.column_config.NumberColumn("Readings", format="%d"),
         },
     )
-
-    if st.button("Refresh nightly heart rate tables"):
-        refresh_heart_rate_nightly_tables()
-        get_heart_rate_nightly_summary.clear()
-        st.rerun()
