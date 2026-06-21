@@ -173,6 +173,7 @@ def _hrv_metric_baseline_plot(
     baseline: float,
     color_above: str,
     color_below: str,
+    unit: str = "ms",
 ) -> tuple[go.Figure, float, float]:
     above_baseline = detail_data[metric] > baseline
     below_baseline = detail_data[metric] < baseline
@@ -187,7 +188,7 @@ def _hrv_metric_baseline_plot(
             mode="lines",
             name=label,
             line={"color": "rgba(75, 85, 99, 0.45)", "width": 1.5},
-            hovertemplate="%{x|%H:%M}<br>%{y:.2f} ms<extra></extra>",
+            hovertemplate=f"%{{x|%H:%M}}<br>%{{y:.2f}} {unit}<extra></extra>",
         )
     )
     fig.add_trace(
@@ -197,7 +198,7 @@ def _hrv_metric_baseline_plot(
             mode="markers",
             name=f"Above baseline ({above_pct:.1f}%)",
             marker={"color": color_above, "size": 6},
-            hovertemplate="%{x|%H:%M}<br>%{y:.2f} ms<extra>Above baseline</extra>",
+            hovertemplate=f"%{{x|%H:%M}}<br>%{{y:.2f}} {unit}<extra>Above baseline</extra>",
         )
     )
     fig.add_trace(
@@ -207,7 +208,7 @@ def _hrv_metric_baseline_plot(
             mode="markers",
             name=f"Below baseline ({below_pct:.1f}%)",
             marker={"color": color_below, "size": 6},
-            hovertemplate="%{x|%H:%M}<br>%{y:.2f} ms<extra>Below baseline</extra>",
+            hovertemplate=f"%{{x|%H:%M}}<br>%{{y:.2f}} {unit}<extra>Below baseline</extra>",
         )
     )
     fig.add_trace(
@@ -215,16 +216,16 @@ def _hrv_metric_baseline_plot(
             x=[detail_data["start_time_local"].min(), detail_data["start_time_local"].max()],
             y=[baseline, baseline],
             mode="lines",
-            name=f"7-night baseline: {baseline:.2f} ms",
+            name=f"7-night baseline: {baseline:.2f} {unit}",
             line={"color": "#facc15", "width": 3, "dash": "dot"},
-            hovertemplate=f"7-night baseline: {baseline:.2f} ms<extra></extra>",
+            hovertemplate=f"7-night baseline: {baseline:.2f} {unit}<extra></extra>",
         )
     )
     fig.update_layout(
         height=360,
         margin={"l": 8, "r": 8, "t": 24, "b": 8},
         xaxis_title="Local time",
-        yaxis_title=f"{label} (ms)",
+        yaxis_title=f"{label} ({unit})" if unit else label,
         legend_orientation="h",
         legend_yanchor="bottom",
         legend_y=1.02,
@@ -254,6 +255,11 @@ def render_hrv_details_page() -> None:
         min_periods=1,
     ).mean()
     calendar_data["rmssd_7d_avg"] = calendar_data["avg_rmssd"].rolling(
+        window=7,
+        min_periods=1,
+    ).mean()
+    calendar_data["sdnn_rmssd_ratio"] = calendar_data["avg_sdnn"] / calendar_data["avg_rmssd"]
+    calendar_data["sdnn_rmssd_ratio_7d_avg"] = calendar_data["sdnn_rmssd_ratio"].rolling(
         window=7,
         min_periods=1,
     ).mean()
@@ -331,8 +337,10 @@ def render_hrv_details_page() -> None:
         detail_data = readings.copy()
         detail_data["start_time_local"] = pd.to_datetime(detail_data["start_time_local"])
         detail_data["end_time_local"] = pd.to_datetime(detail_data["end_time_local"])
+        detail_data["sdnn_rmssd_ratio"] = detail_data["sdnn"] / detail_data["rmssd"]
         sdnn_baseline = float(selected_summary.sdnn_7d_avg)
         rmssd_baseline = float(selected_summary.rmssd_7d_avg)
+        ratio_baseline = float(selected_summary.sdnn_rmssd_ratio_7d_avg)
 
         detail_cols = st.columns(4)
         detail_cols[0].metric("Avg RMSSD", f"{selected_summary.avg_rmssd:.1f} ms")
@@ -359,6 +367,15 @@ def render_hrv_details_page() -> None:
             color_above="#0f766e",
             color_below="#2563eb",
         )
+        ratio_fig, ratio_above_pct, ratio_below_pct = _hrv_metric_baseline_plot(
+            detail_data=detail_data,
+            metric="sdnn_rmssd_ratio",
+            label="SDNN / RMSSD",
+            baseline=ratio_baseline,
+            color_above="#0f766e",
+            color_below="#2563eb",
+            unit="",
+        )
 
         sdnn_cols = st.columns(3)
         sdnn_cols[0].metric("SDNN baseline", f"{sdnn_baseline:.2f} ms")
@@ -372,6 +389,12 @@ def render_hrv_details_page() -> None:
         rmssd_cols[2].metric("RMSSD below", f"{rmssd_below_pct:.1f}%")
         st.plotly_chart(rmssd_fig, width="stretch")
 
+        ratio_cols = st.columns(3)
+        ratio_cols[0].metric("Ratio baseline", f"{ratio_baseline:.2f}")
+        ratio_cols[1].metric("Ratio above", f"{ratio_above_pct:.1f}%")
+        ratio_cols[2].metric("Ratio below", f"{ratio_below_pct:.1f}%")
+        st.plotly_chart(ratio_fig, width="stretch")
+
         with st.expander("Raw readings", expanded=False):
             st.dataframe(
                 detail_data[
@@ -380,6 +403,7 @@ def render_hrv_details_page() -> None:
                         "end_time_local",
                         "rmssd",
                         "sdnn",
+                        "sdnn_rmssd_ratio",
                         "datauuid",
                     ]
                 ],
@@ -388,6 +412,10 @@ def render_hrv_details_page() -> None:
                 column_config={
                     "rmssd": st.column_config.NumberColumn("RMSSD", format="%.2f ms"),
                     "sdnn": st.column_config.NumberColumn("SDNN", format="%.2f ms"),
+                    "sdnn_rmssd_ratio": st.column_config.NumberColumn(
+                        "SDNN / RMSSD",
+                        format="%.2f",
+                    ),
                 },
             )
 
