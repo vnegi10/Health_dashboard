@@ -7,13 +7,31 @@ def main() -> None:
     st.title("Health Dashboard")
     st.caption("Samsung Health analytics powered by DuckDB")
 
-    st.page_link("pages/01_Raw_Export_Status.py", label="Raw Export Status")
-    st.page_link("pages/02_HRV_Nightly_Summary.py", label="HRV Nightly Summary")
-    st.page_link("pages/03_HRV_Nightly_Details.py", label="HRV Nightly Details")
-    st.page_link("pages/04_Steps_Summary.py", label="Steps Summary")
-    st.page_link("pages/05_HR_Summary.py", label="HR Summary")
-    st.page_link("pages/06_HR_Nightly_Summary.py", label="HR Nightly Summary")
-    st.page_link("pages/07_HR_Nightly_Details.py", label="HR Nightly Details")
+    st.subheader("Tech Stack")
+
+    stack_cols = st.columns(3)
+    stack_cols[0].metric("Package manager", "uv")
+    stack_cols[1].metric("Analytics engine", "DuckDB")
+    stack_cols[2].metric("Dashboard UI", "Streamlit")
+
+    st.markdown(
+        """
+        - **Python** powers the ingestion, ETL, and dashboard logic.
+        - **uv** manages the project environment, dependencies, and commands.
+        - **DuckDB** stores raw Samsung Health exports and derived analytical tables.
+        - **Streamlit** provides the interactive dashboard pages.
+        - **Plotly** renders the time-series charts and calendar-style heatmaps.
+        - **pandas** supports lightweight dataframe transformations for the UI layer.
+        """
+    )
+
+    st.subheader("Data Flow")
+    st.markdown(
+        """
+        Samsung Health CSV and JSON exports are kept locally in `data/`, transformed into
+        DuckDB tables in `warehouse/health.duckdb`, and visualized through Streamlit pages.
+        """
+    )
 
 
 if __name__ == "__main__":
