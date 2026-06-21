@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 from config import settings
@@ -165,6 +166,75 @@ def _selected_calendar_date(selection_event, fallback: str) -> str:
     return customdata[0] if customdata else fallback
 
 
+def _hrv_metric_baseline_plot(
+    detail_data: pd.DataFrame,
+    metric: str,
+    label: str,
+    baseline: float,
+    color_above: str,
+    color_below: str,
+) -> tuple[go.Figure, float, float]:
+    above_baseline = detail_data[metric] > baseline
+    below_baseline = detail_data[metric] < baseline
+    above_pct = above_baseline.mean() * 100
+    below_pct = below_baseline.mean() * 100
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=detail_data["start_time_local"],
+            y=detail_data[metric],
+            mode="lines",
+            name=label,
+            line={"color": "rgba(75, 85, 99, 0.45)", "width": 1.5},
+            hovertemplate="%{x|%H:%M}<br>%{y:.2f} ms<extra></extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=detail_data.loc[above_baseline, "start_time_local"],
+            y=detail_data.loc[above_baseline, metric],
+            mode="markers",
+            name=f"Above baseline ({above_pct:.1f}%)",
+            marker={"color": color_above, "size": 6},
+            hovertemplate="%{x|%H:%M}<br>%{y:.2f} ms<extra>Above baseline</extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=detail_data.loc[below_baseline, "start_time_local"],
+            y=detail_data.loc[below_baseline, metric],
+            mode="markers",
+            name=f"Below baseline ({below_pct:.1f}%)",
+            marker={"color": color_below, "size": 6},
+            hovertemplate="%{x|%H:%M}<br>%{y:.2f} ms<extra>Below baseline</extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[detail_data["start_time_local"].min(), detail_data["start_time_local"].max()],
+            y=[baseline, baseline],
+            mode="lines",
+            name=f"7-night baseline: {baseline:.2f} ms",
+            line={"color": "#facc15", "width": 3, "dash": "dot"},
+            hovertemplate=f"7-night baseline: {baseline:.2f} ms<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        height=360,
+        margin={"l": 8, "r": 8, "t": 24, "b": 8},
+        xaxis_title="Local time",
+        yaxis_title=f"{label} (ms)",
+        legend_orientation="h",
+        legend_yanchor="bottom",
+        legend_y=1.02,
+        legend_xanchor="right",
+        legend_x=1,
+    )
+
+    return fig, above_pct, below_pct
+
+
 def render_hrv_details_page() -> None:
     st.title("HRV Nightly Details")
     st.caption("Calendar view with per-night HRV variation")
@@ -178,6 +248,15 @@ def render_hrv_details_page() -> None:
 
     calendar_data = hrv_summary.copy()
     calendar_data["night_start_date"] = pd.to_datetime(calendar_data["night_start_date"])
+    calendar_data = calendar_data.sort_values("night_start_date")
+    calendar_data["sdnn_7d_avg"] = calendar_data["avg_sdnn"].rolling(
+        window=7,
+        min_periods=1,
+    ).mean()
+    calendar_data["rmssd_7d_avg"] = calendar_data["avg_rmssd"].rolling(
+        window=7,
+        min_periods=1,
+    ).mean()
     calendar_data["date"] = calendar_data["night_start_date"].dt.strftime("%Y-%m-%d")
     calendar_data["week_start"] = calendar_data["night_start_date"] - pd.to_timedelta(
         calendar_data["night_start_date"].dt.weekday,
@@ -252,6 +331,8 @@ def render_hrv_details_page() -> None:
         detail_data = readings.copy()
         detail_data["start_time_local"] = pd.to_datetime(detail_data["start_time_local"])
         detail_data["end_time_local"] = pd.to_datetime(detail_data["end_time_local"])
+        sdnn_baseline = float(selected_summary.sdnn_7d_avg)
+        rmssd_baseline = float(selected_summary.rmssd_7d_avg)
 
         detail_cols = st.columns(4)
         detail_cols[0].metric("Avg RMSSD", f"{selected_summary.avg_rmssd:.1f} ms")
@@ -262,46 +343,53 @@ def render_hrv_details_page() -> None:
             f"{detail_data.start_time_local.min():%H:%M} - {detail_data.end_time_local.max():%H:%M}",
         )
 
-        chart_data = detail_data.melt(
-            id_vars=["start_time_local"],
-            value_vars=["rmssd", "sdnn"],
-            var_name="metric",
-            value_name="milliseconds",
+        sdnn_fig, sdnn_above_pct, sdnn_below_pct = _hrv_metric_baseline_plot(
+            detail_data=detail_data,
+            metric="sdnn",
+            label="SDNN",
+            baseline=sdnn_baseline,
+            color_above="#0f766e",
+            color_below="#2563eb",
         )
-        chart_data["metric"] = chart_data["metric"].replace({"rmssd": "RMSSD", "sdnn": "SDNN"})
+        rmssd_fig, rmssd_above_pct, rmssd_below_pct = _hrv_metric_baseline_plot(
+            detail_data=detail_data,
+            metric="rmssd",
+            label="RMSSD",
+            baseline=rmssd_baseline,
+            color_above="#0f766e",
+            color_below="#2563eb",
+        )
 
-        detail_fig = px.line(
-            chart_data,
-            x="start_time_local",
-            y="milliseconds",
-            color="metric",
-            labels={
-                "start_time_local": "Local time",
-                "milliseconds": "HRV (ms)",
-                "metric": "Metric",
-            },
-            color_discrete_map={"RMSSD": "#0f766e", "SDNN": "#7c3aed"},
-        )
-        detail_fig.update_layout(height=420, margin={"l": 8, "r": 8, "t": 24, "b": 8})
-        st.plotly_chart(detail_fig, width="stretch")
+        sdnn_cols = st.columns(3)
+        sdnn_cols[0].metric("SDNN baseline", f"{sdnn_baseline:.2f} ms")
+        sdnn_cols[1].metric("SDNN above", f"{sdnn_above_pct:.1f}%")
+        sdnn_cols[2].metric("SDNN below", f"{sdnn_below_pct:.1f}%")
+        st.plotly_chart(sdnn_fig, width="stretch")
 
-        st.dataframe(
-            detail_data[
-                [
-                    "start_time_local",
-                    "end_time_local",
-                    "rmssd",
-                    "sdnn",
-                    "datauuid",
-                ]
-            ],
-            width="stretch",
-            hide_index=True,
-            column_config={
-                "rmssd": st.column_config.NumberColumn("RMSSD", format="%.2f ms"),
-                "sdnn": st.column_config.NumberColumn("SDNN", format="%.2f ms"),
-            },
-        )
+        rmssd_cols = st.columns(3)
+        rmssd_cols[0].metric("RMSSD baseline", f"{rmssd_baseline:.2f} ms")
+        rmssd_cols[1].metric("RMSSD above", f"{rmssd_above_pct:.1f}%")
+        rmssd_cols[2].metric("RMSSD below", f"{rmssd_below_pct:.1f}%")
+        st.plotly_chart(rmssd_fig, width="stretch")
+
+        with st.expander("Raw readings", expanded=False):
+            st.dataframe(
+                detail_data[
+                    [
+                        "start_time_local",
+                        "end_time_local",
+                        "rmssd",
+                        "sdnn",
+                        "datauuid",
+                    ]
+                ],
+                width="stretch",
+                hide_index=True,
+                column_config={
+                    "rmssd": st.column_config.NumberColumn("RMSSD", format="%.2f ms"),
+                    "sdnn": st.column_config.NumberColumn("SDNN", format="%.2f ms"),
+                },
+            )
 
 
 def render_steps_summary_page() -> None:
