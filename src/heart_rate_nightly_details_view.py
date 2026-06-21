@@ -1,5 +1,6 @@
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 from heart_rate import load_heart_rate_nightly_summary, load_heart_rate_readings_for_night
@@ -139,8 +140,13 @@ def render_heart_rate_nightly_details_page() -> None:
         detail_data = readings.copy()
         detail_data["start_time_local"] = pd.to_datetime(detail_data["start_time_local"])
         detail_data["end_time_local"] = pd.to_datetime(detail_data["end_time_local"])
+        rhr = float(selected_summary.avg_heart_rate)
+        above_rhr = detail_data["heart_rate"] > rhr
+        below_rhr = detail_data["heart_rate"] < rhr
+        above_pct = above_rhr.mean() * 100
+        below_pct = below_rhr.mean() * 100
 
-        detail_cols = st.columns(4)
+        detail_cols = st.columns(6)
         detail_cols[0].metric("Avg HR", f"{selected_summary.avg_heart_rate:.1f} bpm")
         detail_cols[1].metric(
             "Range",
@@ -151,18 +157,61 @@ def render_heart_rate_nightly_details_page() -> None:
             "Window",
             f"{detail_data.start_time_local.min():%H:%M} - {detail_data.end_time_local.max():%H:%M}",
         )
+        detail_cols[4].metric("Above RHR", f"{above_pct:.1f}%")
+        detail_cols[5].metric("Below RHR", f"{below_pct:.1f}%")
 
-        detail_fig = px.line(
-            detail_data,
-            x="start_time_local",
-            y="heart_rate",
-            labels={
-                "start_time_local": "Local time",
-                "heart_rate": "Heart rate (bpm)",
-            },
-            color_discrete_sequence=["#dc2626"],
+        detail_fig = go.Figure()
+        detail_fig.add_trace(
+            go.Scatter(
+                x=detail_data["start_time_local"],
+                y=detail_data["heart_rate"],
+                mode="lines",
+                name="Heart rate",
+                line={"color": "rgba(75, 85, 99, 0.45)", "width": 1.5},
+                hovertemplate="%{x|%H:%M}<br>%{y:.1f} bpm<extra></extra>",
+            )
         )
-        detail_fig.update_layout(height=420, margin={"l": 8, "r": 8, "t": 24, "b": 8})
+        detail_fig.add_trace(
+            go.Scatter(
+                x=detail_data.loc[above_rhr, "start_time_local"],
+                y=detail_data.loc[above_rhr, "heart_rate"],
+                mode="markers",
+                name=f"Above RHR ({above_pct:.1f}%)",
+                marker={"color": "#dc2626", "size": 6},
+                hovertemplate="%{x|%H:%M}<br>%{y:.1f} bpm<extra>Above RHR</extra>",
+            )
+        )
+        detail_fig.add_trace(
+            go.Scatter(
+                x=detail_data.loc[below_rhr, "start_time_local"],
+                y=detail_data.loc[below_rhr, "heart_rate"],
+                mode="markers",
+                name=f"Below RHR ({below_pct:.1f}%)",
+                marker={"color": "#2563eb", "size": 6},
+                hovertemplate="%{x|%H:%M}<br>%{y:.1f} bpm<extra>Below RHR</extra>",
+            )
+        )
+        detail_fig.add_trace(
+            go.Scatter(
+                x=[detail_data["start_time_local"].min(), detail_data["start_time_local"].max()],
+                y=[rhr, rhr],
+                mode="lines",
+                name=f"RHR (Resting Heart Rate): {rhr:.1f} bpm",
+                line={"color": "#facc15", "width": 3, "dash": "dot"},
+                hovertemplate=f"RHR: {rhr:.1f} bpm<extra></extra>",
+            )
+        )
+        detail_fig.update_layout(
+            height=420,
+            margin={"l": 8, "r": 8, "t": 24, "b": 8},
+            xaxis_title="Local time",
+            yaxis_title="Heart rate (bpm)",
+            legend_orientation="h",
+            legend_yanchor="bottom",
+            legend_y=1.02,
+            legend_xanchor="right",
+            legend_x=1,
+        )
         st.plotly_chart(detail_fig, width="stretch")
 
         st.dataframe(
